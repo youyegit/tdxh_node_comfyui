@@ -184,16 +184,52 @@ class TdxhLoraLoader:
         model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, lora, strength_model, strength_clip)
         return (model_lora, clip_lora)
 
+class TdxhControlNetApply:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"conditioning": ("CONDITIONING", ),
+                             "control_net": ("CONTROL_NET", ),
+                             "image": ("IMAGE", ),
+                             "enable_or_not": ([
+                                "enable", 
+                                "disable"
+                                ],),
+                             "strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01})
+                             }}
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "apply_controlnet"
+
+    CATEGORY = "TDXH/conditioning"
+
+    def apply_controlnet(self, conditioning, control_net, image,enable_or_not, strength):
+        if enable_or_not == "disable":
+            return (conditioning,) 
+        if strength == 0:
+            return (conditioning, )
+
+        c = []
+        control_hint = image.movedim(-1,1)
+        for t in conditioning:
+            n = [t[0], t[1].copy()]
+            c_net = control_net.copy().set_cond_hint(control_hint, strength)
+            if 'control' in t[1]:
+                c_net.set_previous_controlnet(t[1]['control'])
+            n[1]['control'] = c_net
+            c.append(n)
+        return (c, )
+
 NODE_CLASS_MAPPINGS = {
     "TdxhImageToSize": TdxhImageToSize,
     "TdxhImageToSizeAdvanced":TdxhImageToSizeAdvanced,
-    "TdxhLoraLoader":TdxhLoraLoader
+    "TdxhLoraLoader":TdxhLoraLoader,
+    "TdxhControlNetApply":TdxhControlNetApply
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TdxhImageToSize": "TdxhImageToSize",
     "TdxhImageToSizeAdvanced":"TdxhImageToSizeAdvanced",
-    "TdxhLoraLoader":"TdxhLoraLoader"
+    "TdxhLoraLoader":"TdxhLoraLoader",
+    "TdxhControlNetApply":"TdxhControlNetApply"
 }
 
 
