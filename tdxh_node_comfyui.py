@@ -121,6 +121,7 @@ class TdxhImageToSizeAdvanced:
         else:
             return num + (8 - remainder)
 
+# allow setting enable or disable. allow setting strength synchronously
 class TdxhLoraLoader:
     def __init__(self):
         self.loaded_lora = None
@@ -130,7 +131,11 @@ class TdxhLoraLoader:
         return {"required": { 
             "model": ("MODEL",),
             "clip": ("CLIP", ),
-            "lora_name": (folder_paths.get_filename_list("loras").insert(0, "None"), ),
+            "enable_or_not": ([
+                "enable", 
+                "disable"
+                ],),
+            "lora_name": (folder_paths.get_filename_list("loras"), ),
             "strength_both": ("FLOAT", {
                 "default": 0.5, "min": -10.0, 
                 "max": 10.0, "step": 0.05
@@ -154,8 +159,8 @@ class TdxhLoraLoader:
 
     CATEGORY = "TDXH/tdxh_model"
 
-    def load_lora(self, model, clip, lora_name, strength_both,strength_model, strength_clip, what_to_follow):
-        if lora_name == "None":
+    def load_lora(self, model, clip, enable_or_not, lora_name, strength_both,strength_model, strength_clip, what_to_follow):
+        if enable_or_not == "disable":
             return (model, clip)
         if what_to_follow == "only_strength_both":
             strength_model, strength_clip = strength_both, strength_both
