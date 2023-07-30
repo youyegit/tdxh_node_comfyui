@@ -53,13 +53,13 @@ class TdxhImageToSizeAdvanced:
                 "width": ("INT", {
                     "default": 768, 
                     "min": 128, 
-                    "max": 4096, 
+                    "max": 8192, 
                     "step": 8 
                 }),
                 "height": ("INT", {
                     "default": 768, 
                     "min": 128, 
-                    "max": 4096, 
+                    "max": 8192, 
                     "step": 8 
                 }),
                 "ratio": ("FLOAT", {
@@ -90,7 +90,7 @@ class TdxhImageToSizeAdvanced:
             return image_size
         elif what_to_follow == "only_ratio":
             w, h = ratio * image_size[0], ratio * image_size[1]
-            w, h = self.tdxh_nearest_divisible_by_8(w), self.tdxh_nearest_divisible_by_8(w)
+            w, h = self.tdxh_nearest_divisible_by_8(w), self.tdxh_nearest_divisible_by_8(h)
         elif what_to_follow == "both_width_and_height":
             w, h = width, height
         elif what_to_follow == "only_width":
@@ -125,7 +125,6 @@ class TdxhImageToSizeAdvanced:
 class TdxhLoraLoader:
     def __init__(self):
         self.loaded_lora = None
-
     @classmethod
     def INPUT_TYPES(s):
         return {"required": { 
@@ -218,18 +217,99 @@ class TdxhControlNetApply:
             c.append(n)
         return (c, )
 
+class TdxhIntInput:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "int_value": ("INT", {
+                    "default": 1, 
+                    "min": -100000, 
+                    "max": 100000, 
+                    "step": 1 
+                }),
+            }
+        }
+
+    RETURN_TYPES = ("INT",)
+    RETURN_NAMES = ("INT",)
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_data"
+
+    def tdxh_value_output(self,int_value):
+        return (int_value,)
+
+class TdxhFloatInput:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "float_value": ("FLOAT", {
+                    "default": 1.0, 
+                    "min": -100000.0, 
+                    "max": 100000.0, 
+                    "step": 0.01
+                }),
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("FLOAT", )
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_data"
+
+    def tdxh_value_output(self,float_value):
+        return (float_value,)
+
+class TdxhStringInput:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "string_value": ("STRING", {
+                    "multiline": False, 
+                    "default": "tdxh"
+                }),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("STRING",)
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_data"
+
+    def tdxh_value_output(self, string_value):
+        return (string_value,)
+
 NODE_CLASS_MAPPINGS = {
+    # tdxh_image
     "TdxhImageToSize": TdxhImageToSize,
     "TdxhImageToSizeAdvanced":TdxhImageToSizeAdvanced,
+    # tdxh_model
     "TdxhLoraLoader":TdxhLoraLoader,
-    "TdxhControlNetApply":TdxhControlNetApply
+    # conditioning
+    "TdxhControlNetApply":TdxhControlNetApply,
+    # tdxh_data
+    "TdxhIntInput":TdxhIntInput,
+    "TdxhFloatInput":TdxhFloatInput,
+    "TdxhStringInput":TdxhStringInput,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    # tdxh_image
     "TdxhImageToSize": "TdxhImageToSize",
     "TdxhImageToSizeAdvanced":"TdxhImageToSizeAdvanced",
+    # tdxh_model
     "TdxhLoraLoader":"TdxhLoraLoader",
-    "TdxhControlNetApply":"TdxhControlNetApply"
+    # conditioning
+    "TdxhControlNetApply":"TdxhControlNetApply",
+    # tdxh_data
+    "TdxhIntInput":"TdxhIntInput",
+    "TdxhFloatInput":"TdxhFloatInput",
+    "TdxhStringInput":"TdxhStringInput",
 }
 
 
