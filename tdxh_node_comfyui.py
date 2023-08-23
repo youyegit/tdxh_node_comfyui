@@ -10,6 +10,8 @@ import comfy.sd
 
 import folder_paths
 
+from .tdxh_lib import get_SDXL_best_size
+
 # Tensor to PIL
 def tensor2pil(image):
     return Image.fromarray(np.clip(255. * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
@@ -70,7 +72,7 @@ class TdxhImageToSizeAdvanced:
                 }),
                 "what_to_follow": ([
                     "only_width", "only_height", "both_width_and_height", "only_ratio", 
-                    "only_image"
+                    "only_image","get_SDXL_best_size"
                 ],),
             }
         }
@@ -85,9 +87,10 @@ class TdxhImageToSizeAdvanced:
         image_size = self.tdxh_image_to_size(image)
         # width = self.tdxh_nearest_divisible_by_8(width)
         # height = self.tdxh_nearest_divisible_by_8(height)
-        # w, h = image_size[0], image_size[1]
         if what_to_follow == "only_image":
             return image_size
+        elif what_to_follow == "get_SDXL_best_size":
+            w, h = get_SDXL_best_size((image_size[0],image_size[1]))
         elif what_to_follow == "only_ratio":
             w, h = ratio * image_size[0], ratio * image_size[1]
             w, h = self.tdxh_nearest_divisible_by_8(w), self.tdxh_nearest_divisible_by_8(h)
@@ -99,6 +102,7 @@ class TdxhImageToSizeAdvanced:
         elif what_to_follow == "only_height":
             new_width = self.tdxh_nearest_divisible_by_8(image_size[0] * height / image_size[1])
             w, h = new_width, height
+
         return self.tdxh_size_out(w,h)
     
     def tdxh_image_to_size(self, image):
