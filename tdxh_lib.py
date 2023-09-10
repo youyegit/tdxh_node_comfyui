@@ -8,9 +8,9 @@ def get_SDXL_best_size(image_size):
     # Define a list to store the target sizes
 
     SD_XL_BASE_RATIOS = {
-    "0.33": (576, 1728), # 推测新增
-    "0.35": (576, 1664), # 推测新增
-    "0.42": (640, 1536), # 新增
+    "0.33": (576, 1728), # guess and add
+    "0.35": (576, 1664), # guess and add
+    "0.42": (640, 1536), # add
     "0.5": (704, 1408),
     "0.52": (704, 1344),
     "0.57": (768, 1344),
