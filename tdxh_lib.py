@@ -83,4 +83,4 @@ def test1():
     print(get_SDXL_best_size((1080, 1920))) # Output (768, 1344)
     print(get_SDXL_best_size((1200, 500))) # Output (1536, 640)
 
-test1()
+# test1()
