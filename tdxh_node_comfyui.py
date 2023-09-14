@@ -1,7 +1,7 @@
 from PIL import Image
 import numpy as np
-# import os
-# import sys
+import os
+import sys
 
 # sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "comfy"))
 
@@ -11,6 +11,12 @@ import comfy.sd
 import folder_paths
 
 from .tdxh_lib import get_SDXL_best_size
+
+# Get the absolute path of various directories
+my_dir = os.path.dirname(os.path.abspath(__file__))
+custom_nodes_dir = os.path.abspath(os.path.join(my_dir, '..'))
+comfy_dir = os.path.abspath(os.path.join(my_dir, '..', '..'))
+sys.path.append(my_dir)
 
 # Tensor to PIL
 def tensor2pil(image):
@@ -253,6 +259,104 @@ class TdxhStringInput:
 
     def tdxh_value_output(self, string_value):
         return (string_value,)
+    
+class TdxhStringInputTranslator:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "string_value": (
+                    "STRING", 
+                    {
+                        "multiline": True, 
+                        "default": "moon"
+                    }
+                ),
+                "enable_or_not": (
+                    [
+                    "enable", 
+                    "disable"
+                    ],
+                ),
+                "input_language": (
+                    [
+                        r"中文", 
+                        r"عربية", 
+                        r"Deutsch", 
+                        r"Español", 
+                        r"Français", 
+                        r"हिन्दी", 
+                        r"Italiano", 
+                        r"日本語", 
+                        r"한국어", 
+                        r"Português", 
+                        r"Русский", 
+                        r"Afrikaans", 
+                        r"বাংলা", 
+                        r"Bosanski", 
+                        r"Català", 
+                        r"Čeština", 
+                        r"Dansk", 
+                        r"Ελληνικά", 
+                        r"Eesti", 
+                        r"فارسی", 
+                        r"Suomi", 
+                        r"ગુજરાતી", 
+                        r"עברית", 
+                        r"हिन्दी", 
+                        r"Hrvatski", 
+                        r"Magyar", 
+                        r"Bahasa Indonesia", 
+                        r"Íslenska", 
+                        r"日本語", 
+                        r"Javanese", 
+                        r"ქართული", 
+                        r"Қазақ", 
+                        r"ខ្មែរ", 
+                        r"ಕನ್ನಡ", 
+                        r"한국어", 
+                        r"ລາວ", 
+                        r"Lietuvių", 
+                        r"Latviešu", 
+                        r"Македонски", 
+                        r"മലയാളം", 
+                        r"मराठी", 
+                        r"Bahasa Melayu", 
+                        r"नेपाली", 
+                        r"Nederlands", 
+                        r"Norsk", 
+                        r"Polski",
+                        r"Română", 
+                        r"සිංහල", 
+                        r"Slovenčina", 
+                        r"Slovenščina", 
+                        r"Shqip",  
+                        r"Turkish", 
+                        r"Tiếng Việt",
+                    ],
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("STRING",)
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_data"
+
+    def tdxh_value_output(self, string_value, enable_or_not, input_language):
+        if enable_or_not == "disable":
+            return (string_value,)
+        from tdxh_translator import Prompt,TranslatorScript
+        prompt_list=[str(string_value)]
+        p_in = Prompt(prompt_list, [""])
+
+        translator = TranslatorScript()
+        translator.set_active()
+        translator.process(p_in,input_language)
+        
+        string_value_out=p_in.positive_prompt_list[0] if p_in.positive_prompt_list is not None else ""
+        return (string_value_out,)
 
 NODE_CLASS_MAPPINGS = {
     # tdxh_image
@@ -264,6 +368,7 @@ NODE_CLASS_MAPPINGS = {
     "TdxhIntInput":TdxhIntInput,
     "TdxhFloatInput":TdxhFloatInput,
     "TdxhStringInput":TdxhStringInput,
+    "TdxhStringInputTranslator":TdxhStringInputTranslator,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -276,6 +381,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TdxhIntInput":"TdxhIntInput",
     "TdxhFloatInput":"TdxhFloatInput",
     "TdxhStringInput":"TdxhStringInput",
+    "TdxhStringInputTranslator":"TdxhStringInputTranslator",
 }
 
 
