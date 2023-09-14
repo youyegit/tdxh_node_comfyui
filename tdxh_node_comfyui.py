@@ -140,10 +140,12 @@ class TdxhLoraLoader:
         return {"required": { 
             "model": ("MODEL",),
             "clip": ("CLIP", ),
-            "enable_or_not": ([
-                "enable", 
-                "disable"
-                ],),
+            "bool_int": ("INT", {
+                "default": 1, 
+                "min": 0, 
+                "max": 1, 
+                "step": 1 
+            }),
             "lora_name": (folder_paths.get_filename_list("loras"), ),
             "strength_both": ("FLOAT", {
                 "default": 0.5, "min": -10.0, 
@@ -168,8 +170,8 @@ class TdxhLoraLoader:
 
     CATEGORY = "TDXH/tdxh_model"
 
-    def load_lora(self, model, clip, enable_or_not, lora_name, strength_both,strength_model, strength_clip, what_to_follow):
-        if enable_or_not == "disable":
+    def load_lora(self, model, clip, bool_int, lora_name, strength_both,strength_model, strength_clip, what_to_follow):
+        if bool_int == 0:
             return (model, clip)
         if what_to_follow == "only_strength_both":
             strength_model, strength_clip = strength_both, strength_both
@@ -258,8 +260,7 @@ class TdxhStringInput:
     CATEGORY = "TDXH/tdxh_data"
 
     def tdxh_value_output(self, string_value):
-        return (string_value,)
-    
+        return (string_value,)   
 class TdxhStringInputTranslator:
     @classmethod
     def INPUT_TYPES(cls):
@@ -272,12 +273,12 @@ class TdxhStringInputTranslator:
                         "default": "moon"
                     }
                 ),
-                "enable_or_not": (
-                    [
-                    "enable", 
-                    "disable"
-                    ],
-                ),
+                "bool_int": ("INT", {
+                    "default": 1, 
+                    "min": 0, 
+                    "max": 1, 
+                    "step": 1 
+                }),
                 "input_language": (
                     [
                         r"中文", 
@@ -343,8 +344,8 @@ class TdxhStringInputTranslator:
     #OUTPUT_NODE = False
     CATEGORY = "TDXH/tdxh_data"
 
-    def tdxh_value_output(self, string_value, enable_or_not, input_language):
-        if enable_or_not == "disable":
+    def tdxh_value_output(self, string_value, bool_int, input_language):
+        if bool_int == 0:
             return (string_value,)
         from tdxh_translator import Prompt,TranslatorScript
         prompt_list=[str(string_value)]
@@ -356,6 +357,30 @@ class TdxhStringInputTranslator:
         
         string_value_out=p_in.positive_prompt_list[0] if p_in.positive_prompt_list is not None else ""
         return (string_value_out,)
+    
+class TdxhOnOrOff:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "ON_or_OFF": (
+                    [
+                    "ON", 
+                    "OFF"
+                    ],
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("NUMBER","INT")
+    RETURN_NAMES = ("NUMBER","INT")
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_bool"
+
+    def tdxh_value_output(self, ON_or_OFF):
+        bool_num = 1 if ON_or_OFF == "ON" else 0
+        return (bool_num, bool_num)
 
 NODE_CLASS_MAPPINGS = {
     # tdxh_image
@@ -368,6 +393,8 @@ NODE_CLASS_MAPPINGS = {
     "TdxhFloatInput":TdxhFloatInput,
     "TdxhStringInput":TdxhStringInput,
     "TdxhStringInputTranslator":TdxhStringInputTranslator,
+    # tdxh_bool
+    "TdxhOnOrOff":TdxhOnOrOff,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -381,6 +408,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TdxhFloatInput":"TdxhFloatInput",
     "TdxhStringInput":"TdxhStringInput",
     "TdxhStringInputTranslator":"TdxhStringInputTranslator",
+    # tdxh_bool
+    "TdxhOnOrOff":"TdxhOnOrOff",
 }
 
 
