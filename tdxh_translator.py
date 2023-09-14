@@ -199,7 +199,6 @@ language_options = [
     LanguageOption("Magyar", "hu_HU"),
     LanguageOption("Bahasa Indonesia", "id_ID"),
     LanguageOption("Íslenska", "is_IS"),
-    LanguageOption("日本語", "ja_XX"),
     LanguageOption("Javanese", "jv_XX"),
     LanguageOption("ქართული", "ka_GE"),
     LanguageOption("Қазақ", "kk_XX"),

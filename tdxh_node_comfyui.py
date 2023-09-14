@@ -308,7 +308,6 @@ class TdxhStringInputTranslator:
                         r"Magyar", 
                         r"Bahasa Indonesia", 
                         r"Íslenska", 
-                        r"日本語", 
                         r"Javanese", 
                         r"ქართული", 
                         r"Қазақ", 
