@@ -1,8 +1,7 @@
 # Introduction
 Some nodes for stable diffusion comfyui.Sometimes it helps conveniently to use less nodes for doing the same things.
 
-If you use workflow in my "blogs" repo, you need to dowmload these nodes.
-
+If you use workflow in my "blogs" repo, you need to dowmload these nodes.I don't guarantee that the nodes will stay the same always. Some nodes maybe have been changed if you update the new version.
 # How to install
 ## The repo
 The same with others custom nodes. Just cd custom_nodes and then git clone.
