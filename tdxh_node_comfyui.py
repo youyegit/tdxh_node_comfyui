@@ -10,7 +10,7 @@ import comfy.sd
 
 import folder_paths
 
-from .tdxh_lib import get_SDXL_best_size
+from .tdxh_lib import get_SDXL_best_size, target_sizes_show
 
 # Get the absolute path of various directories
 my_dir = os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +70,7 @@ class TdxhImageToSizeAdvanced:
                     "max": 8192, 
                     "step": 8 
                 }),
+                "width_multiply_by_height": (target_sizes_show,{"default": '1.0: (1024, 1024)'}),
                 "ratio": ("FLOAT", {
                     "default": 1.0, 
                     "min": 0.0, 
@@ -77,7 +78,7 @@ class TdxhImageToSizeAdvanced:
                     "step": 0.1
                 }),
                 "what_to_follow": ([
-                    "only_width", "only_height", "both_width_and_height", "only_ratio", 
+                    "only_width", "only_height", "both_width_and_height","width * height", "only_ratio", 
                     "only_image","get_SDXL_best_size"
                 ],),
             }
@@ -89,7 +90,7 @@ class TdxhImageToSizeAdvanced:
     #OUTPUT_NODE = False
     CATEGORY = "TDXH/tdxh_image"
 
-    def tdxh_image_to_size_advanced(self, image, width, height, ratio,what_to_follow):
+    def tdxh_image_to_size_advanced(self, image, width, height, width_multiply_by_height,ratio,what_to_follow):
         image_size = self.tdxh_image_to_size(image)
         # width = self.tdxh_nearest_divisible_by_8(width)
         # height = self.tdxh_nearest_divisible_by_8(height)
@@ -102,6 +103,9 @@ class TdxhImageToSizeAdvanced:
             w, h = self.tdxh_nearest_divisible_by_8(w), self.tdxh_nearest_divisible_by_8(h)
         elif what_to_follow == "both_width_and_height":
             w, h = width, height
+        elif  what_to_follow == "width * height":
+            w_h_str = width_multiply_by_height.split(':')[-1].strip('()')  # '3.0: (1728, 576)'
+            w, h = map(int, w_h_str.split(','))
         elif what_to_follow == "only_width":
             new_height = self.tdxh_nearest_divisible_by_8(image_size[1] * width / image_size[0])
             w, h = width, new_height
@@ -138,24 +142,21 @@ class TdxhLoraLoader:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": { 
+            "bool_int": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+
             "model": ("MODEL",),
             "clip": ("CLIP", ),
-            "bool_int": ("INT", {
-                "default": 1, 
-                "min": 0, 
-                "max": 1, 
-                "step": 1 
-            }),
             "lora_name": (folder_paths.get_filename_list("loras"), ),
-            "strength_both": ("FLOAT", {
-                "default": 0.5, "min": -10.0, 
-                "max": 10.0, "step": 0.05
-                }),
             "strength_model": ("FLOAT", {
                 "default": 0.5, "min": -10.0, 
                 "max": 10.0, "step": 0.05
                 }),
             "strength_clip": ("FLOAT", {
+                "default": 0.5, "min": -10.0, 
+                "max": 10.0, "step": 0.05
+                }),
+
+            "strength_both": ("FLOAT", {
                 "default": 0.5, "min": -10.0, 
                 "max": 10.0, "step": 0.05
                 }),
@@ -171,29 +172,12 @@ class TdxhLoraLoader:
     CATEGORY = "TDXH/tdxh_model"
 
     def load_lora(self, model, clip, bool_int, lora_name, strength_both,strength_model, strength_clip, what_to_follow):
+        from nodes import LoraLoader
         if bool_int == 0:
             return (model, clip)
         if what_to_follow == "only_strength_both":
             strength_model, strength_clip = strength_both, strength_both
-
-        if strength_model == 0 and strength_clip == 0:
-            return (model, clip)
-        lora_path = folder_paths.get_full_path("loras", lora_name)
-        lora = None
-        if self.loaded_lora is not None:
-            if self.loaded_lora[0] == lora_path:
-                lora = self.loaded_lora[1]
-            else:
-                temp = self.loaded_lora
-                self.loaded_lora = None
-                del temp
-
-        if lora is None:
-            lora = comfy.utils.load_torch_file(lora_path, safe_load=True)
-            self.loaded_lora = (lora_path, lora)
-
-        model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, lora, strength_model, strength_clip)
-        return (model_lora, clip_lora)
+        return LoraLoader().load_lora( model, clip, lora_name, strength_model, strength_clip) 
 
 class TdxhIntInput:
     @classmethod
@@ -363,12 +347,7 @@ class TdxhOnOrOff:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "ON_or_OFF": (
-                    [
-                    "ON", 
-                    "OFF"
-                    ],
-                ),
+                "ON_or_OFF": (["ON", "OFF"],),
             }
         }
 
@@ -381,6 +360,209 @@ class TdxhOnOrOff:
     def tdxh_value_output(self, ON_or_OFF):
         bool_num = 1 if ON_or_OFF == "ON" else 0
         return (bool_num, bool_num)
+    
+class TdxhBoolNumber:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bool_int": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+                "bool_int_from_master": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+                "control_by_master": (["ON", "OFF"],{"default":"OFF"}),
+            }
+        }
+
+    RETURN_TYPES = ("NUMBER","INT")
+    RETURN_NAMES = ("NUMBER","INT")
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_bool"
+
+    def tdxh_value_output(self, bool_int, bool_int_from_master, control_by_master):
+        if control_by_master == "OFF":
+            bool_num = bool_int
+        else:
+            if bool_int_from_master==1:
+                bool_num =bool_int
+            else:
+                bool_num = 0
+        return (bool_num, bool_num)
+
+class TdxhClipVison:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "bool_int": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+
+            "clip_name": (folder_paths.get_filename_list("clip_vision"), ), # CLIPVisionLoader
+
+            # "clip_vision": ("CLIP_VISION",),
+            "image": ("IMAGE",), # CLIPVisionEncode
+
+            "conditioning": ("CONDITIONING", ),
+            # "clip_vision_output": ("CLIP_VISION_OUTPUT", ),
+            "strength": ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.01}),
+            "noise_augmentation": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+            }}
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "apply_adm"
+
+    CATEGORY = "TDXH/tdxh_efficiency"
+
+    def apply_adm(self,bool_int, clip_name, image, conditioning, strength, noise_augmentation):
+        from nodes import CLIPVisionLoader, CLIPVisionEncode, unCLIPConditioning
+        if bool_int == 0 or strength == 0:
+            return (conditioning,)
+        clip_vision = CLIPVisionLoader().load_clip(clip_name)[0]
+        clip_vision_output = CLIPVisionEncode().encode(clip_vision,image)[0]
+        return unCLIPConditioning().apply_adm(conditioning, clip_vision_output, strength, noise_augmentation)
+
+from custom_nodes.comfyui_controlnet_aux import AUX_NODE_MAPPINGS,AIO_NOT_SUPPORTED
+from nodes import MAX_RESOLUTION
+class TdxhControlNetProcessor:
+    from nodes import ImageScale
+    upscale_methods = ImageScale.upscale_methods
+    crop_methods = ImageScale.crop_methods
+
+    @classmethod
+    def INPUT_TYPES(s):
+        auxs = list(AUX_NODE_MAPPINGS.keys())
+        for name in AIO_NOT_SUPPORTED:
+            if name in auxs: auxs.remove(name)
+        auxs.append("Invert")
+        auxs.append("None")
+        
+        return {
+            "required": { 
+                "bool_int": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+
+                "image": ("IMAGE",), 
+                "upscale_method": (s.upscale_methods,),
+                "width": ("INT", {"default": 512, "min": 1, "max": MAX_RESOLUTION, "step": 1}),
+                "height": ("INT", {"default": 512, "min": 1, "max": MAX_RESOLUTION, "step": 1}),
+                "crop": (s.crop_methods,),
+
+                # "image": ("IMAGE",),
+                "preprocessor": (auxs, {"default": "CannyEdgePreprocessor"})
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "execute"
+
+    CATEGORY = "TDXH/tdxh_efficiency"
+
+    def execute(self, bool_int,
+                image, upscale_method, width, height, crop,
+                preprocessor):
+        from nodes import ImageScale, ImageInvert
+        from custom_nodes.comfyui_controlnet_aux import AIO_Preprocessor
+        if bool_int == 0:
+            return (image,)
+        image = ImageScale().upscale(image, upscale_method, width, height, crop)[0]
+        if preprocessor == "None":
+            return (image,)
+        if preprocessor == "Invert":
+            return ImageInvert().invert(image)
+        return AIO_Preprocessor().execute( preprocessor, image)
+
+
+class TdxhControlNetApply:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "bool_int": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+
+            "control_net_name": (folder_paths.get_filename_list("controlnet"), ),
+
+            "positive": ("CONDITIONING", ),
+            "negative": ("CONDITIONING", ),
+            # "control_net": ("CONTROL_NET", ),
+            "image": ("IMAGE", ),
+            "strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01}),
+            "start_percent": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.001}),
+            "end_percent": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.001})
+            }}
+
+    RETURN_TYPES = ("CONDITIONING","CONDITIONING")
+    RETURN_NAMES = ("positive", "negative")
+    FUNCTION = "apply_controlnet"
+
+    CATEGORY = "TDXH/tdxh_efficiency"
+
+    def apply_controlnet(self, bool_int, 
+        control_net_name, 
+        positive, negative, image, strength, start_percent, end_percent):
+        from nodes import ControlNetLoader,ControlNetApplyAdvanced
+        if bool_int == 0 or strength == 0:
+            return (positive, negative)
+        control_net=ControlNetLoader().load_controlnet(control_net_name)[0]
+        return ControlNetApplyAdvanced().apply_controlnet(positive, negative, control_net, image, strength, start_percent, end_percent)
+
+
+
+class TdxhReference:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { 
+            "bool_int": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+
+            "main_latent":("LATENT",),
+
+            "pixels": ("IMAGE", ), 
+            "vae": ("VAE", ),
+
+            "model": ("MODEL",),
+            # "reference": ("LATENT",),
+            "batch_size": ("INT", {"default": 1, "min": 1, "max": 64})
+            }}
+
+    RETURN_TYPES = ("MODEL", "LATENT")
+    FUNCTION = "reference_only"
+
+    CATEGORY = "TDXH/tdxh_efficiency"
+
+    def reference_only(self, bool_int, main_latent, pixels, vae, model, batch_size):
+        if bool_int == 0:
+            return (model,main_latent)
+        from nodes import VAEEncode
+        from custom_nodes.reference_only import ReferenceOnlySimple
+        reference=VAEEncode().encode(vae, pixels)[0]
+        return ReferenceOnlySimple().reference_only(model, reference, batch_size)
+
+class TdxhImg2ImgLatent:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { 
+            "bool_int": ("INT", {"default": 1, "min": 0, "max": 1, "step": 1}),
+
+            "main_latent":("LATENT",),
+            "main_width": ("INT", {"default": 1024, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+            "main_height": ("INT", {"default": 1024, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+
+            "pixels": ("IMAGE", ), 
+            "vae": ("VAE", ),
+
+            # "samples": ("LATENT",),
+            "amount": ("INT", {"default": 1, "min": 1, "max": 64}),
+
+            "pixels_width": ("INT", {"default": 1024, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+            "pixels_height": ("INT", {"default": 1024, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+            "denoise_img2img":("FLOAT", {"default": 0.5, "min": 0, "max": 1.0, "step": 0.05}),
+            }}
+    RETURN_TYPES = ("LATENT","INT","INT","FLOAT")
+    RETURN_NAMES = ("LATENT","width_INT","height_INT","denoise")
+    FUNCTION = "repeat"
+
+    CATEGORY = "TDXH/tdxh_efficiency"
+
+    def repeat(self, bool_int, main_latent, main_width,main_height, pixels, vae,  amount,pixels_width,pixels_height, denoise_img2img):
+        if bool_int == 0:
+            return (main_latent,main_width,main_height,1.0)
+        from nodes import VAEEncode,RepeatLatentBatch
+        samples = VAEEncode().encode(vae, pixels)[0]
+        return (RepeatLatentBatch().repeat(samples,amount)[0],pixels_width,pixels_height, denoise_img2img)
+
 
 NODE_CLASS_MAPPINGS = {
     # tdxh_image
@@ -395,6 +577,14 @@ NODE_CLASS_MAPPINGS = {
     "TdxhStringInputTranslator":TdxhStringInputTranslator,
     # tdxh_bool
     "TdxhOnOrOff":TdxhOnOrOff,
+    "TdxhBoolNumber":TdxhBoolNumber,
+    # tdxh_efficiency
+    "TdxhClipVison" : TdxhClipVison,
+    "TdxhControlNetProcessor":TdxhControlNetProcessor,
+    "TdxhControlNetApply":TdxhControlNetApply,
+    "TdxhReference":TdxhReference,
+    "TdxhImg2ImgLatent":TdxhImg2ImgLatent,
+
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -410,6 +600,14 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TdxhStringInputTranslator":"TdxhStringInputTranslator",
     # tdxh_bool
     "TdxhOnOrOff":"TdxhOnOrOff",
+    "TdxhBoolNumber":"TdxhBoolNumber",
+    # tdxh_efficiency
+    "TdxhClipVison" : "TdxhClipVison",
+    "TdxhControlNetProcessor":"TdxhControlNetProcessor",
+    "TdxhControlNetApply":"TdxhControlNetApply",
+    "TdxhReference":"TdxhReference",
+    "TdxhImg2ImgLatent":"TdxhImg2ImgLatent",
+
 }
 
 

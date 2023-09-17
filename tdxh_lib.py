@@ -1,13 +1,4 @@
-
-# Define a function that takes a tuple representing the image width and height as a parameter
-def get_SDXL_best_size(image_size):
-    # Assign the image width and height to w and h respectively
-    w, h = image_size
-    # Calculate the image aspect ratio
-    ratio = w / h
-    # Define a list to store the target sizes
-
-    SD_XL_BASE_RATIOS = {
+SD_XL_BASE_RATIOS = {
     "0.33": (576, 1728), # guess and add
     "0.35": (576, 1664), # guess and add
     "0.42": (640, 1536), # add
@@ -39,8 +30,17 @@ def get_SDXL_best_size(image_size):
     "3.0": (1728, 576),
     }
 
+target_sizes_show = [f"{k}:{v}" for k, v in SD_XL_BASE_RATIOS.items()]
+
+# Define a function that takes a tuple representing the image width and height as a parameter
+def get_SDXL_best_size(image_size):
+    # Assign the image width and height to w and h respectively
+    w, h = image_size
+    # Calculate the image aspect ratio
+    ratio = w / h
+    # Define a list to store the target sizes
+
     target_sizes_more = [v for _, v in SD_XL_BASE_RATIOS.items()]
-    # print(target_sizes_more)
     target_sizes = target_sizes_more
 
     # target_sizes = [
@@ -54,7 +54,6 @@ def get_SDXL_best_size(image_size):
     #     (1536, 640), # 2.4        # 12/5
     #     (640, 1536)  # 0.4166     # 5/12
     # ]
-
 
     # Define a variable to store the minimum difference
     min_diff = float('inf')
@@ -84,3 +83,4 @@ def test1():
     print(get_SDXL_best_size((1200, 500))) # Output (1536, 640)
 
 # test1()
+# print(target_sizes_show)
