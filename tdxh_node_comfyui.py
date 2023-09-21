@@ -70,7 +70,7 @@ class TdxhImageToSizeAdvanced:
                     "max": 8192, 
                     "step": 8 
                 }),
-                "width_multiply_by_height": (target_sizes_show,{"default": '1.0: (1024, 1024)'}),
+                "width_multiply_by_height": (target_sizes_show,{"default": '1.0:(1024, 1024)'}),
                 "ratio": ("FLOAT", {
                     "default": 1.0, 
                     "min": 0.0, 
