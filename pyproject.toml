@@ -1,6 +1,6 @@
 [project]
 name = "tdxh_node_comfyui"
-description = "Nodes:TdxhImageToSize, TdxhImageToSizeAdvanced, TdxhLoraLoader, TdxhIntInput, TdxhFloatInput, TdxhStringInput. Some nodes for stable diffusion comfyui. Sometimes it helps conveniently to use less nodes for doing the same things."
+description = "Add Switch on nodes, Make nodes amount small! It helps conveniently to use less nodes for doing the same things.  "
 version = "1.0.0"
 license = "LICENSE"
 dependencies = ["sentencepiece"]
@@ -10,6 +10,6 @@ Repository = "https://github.com/youyegit/tdxh_node_comfyui"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "youyegit"
 DisplayName = "tdxh_node_comfyui"
 Icon = ""
