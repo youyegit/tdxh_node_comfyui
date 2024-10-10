@@ -417,7 +417,11 @@ class TdxhClipVison:
         clip_vision_output = CLIPVisionEncode().encode(clip_vision,image)[0]
         return unCLIPConditioning().apply_adm(conditioning, clip_vision_output, strength, noise_augmentation)
 
-from custom_nodes.comfyui_controlnet_aux import AUX_NODE_MAPPINGS,AIO_NOT_SUPPORTED
+try:
+    from custom_nodes.comfyui_controlnet_aux import AUX_NODE_MAPPINGS, AIO_NOT_SUPPORTED
+except ImportError:
+    AUX_NODE_MAPPINGS = {}
+    AIO_NOT_SUPPORTED = []
 from nodes import MAX_RESOLUTION
 class TdxhControlNetProcessor:
     from nodes import ImageScale
