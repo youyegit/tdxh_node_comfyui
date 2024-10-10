@@ -417,9 +417,9 @@ class TdxhClipVison:
         clip_vision_output = CLIPVisionEncode().encode(clip_vision,image)[0]
         return unCLIPConditioning().apply_adm(conditioning, clip_vision_output, strength, noise_augmentation)
 
-try:
+if os.path.isdir(os.path.join(custom_nodes_dir, 'comfyui_controlnet_aux')):
     from custom_nodes.comfyui_controlnet_aux import AUX_NODE_MAPPINGS, AIO_NOT_SUPPORTED
-except ImportError:
+else:
     AUX_NODE_MAPPINGS = {}
     AIO_NOT_SUPPORTED = []
 from nodes import MAX_RESOLUTION
@@ -447,7 +447,7 @@ class TdxhControlNetProcessor:
                 "crop": (s.crop_methods,),
 
                 # "image": ("IMAGE",),
-                "preprocessor": (auxs, {"default": "CannyEdgePreprocessor"})
+                "preprocessor": (auxs, {"default": "None"})
             }
         }
 
@@ -460,7 +460,6 @@ class TdxhControlNetProcessor:
                 image, upscale_method, width, height, crop,
                 preprocessor):
         from nodes import ImageScale, ImageInvert
-        from custom_nodes.comfyui_controlnet_aux import AIO_Preprocessor
         if bool_int == 0:
             return (image,)
         image = ImageScale().upscale(image, upscale_method, width, height, crop)[0]
@@ -468,7 +467,12 @@ class TdxhControlNetProcessor:
             return (image,)
         if preprocessor == "Invert":
             return ImageInvert().invert(image)
-        return AIO_Preprocessor().execute( preprocessor, image)
+
+        if os.path.isdir(os.path.join(custom_nodes_dir, 'comfyui_controlnet_aux')):
+            from custom_nodes.comfyui_controlnet_aux import AIO_Preprocessor
+            return AIO_Preprocessor().execute( preprocessor, image)
+        else:
+            return (image,)
 
 
 class TdxhControlNetApply:
