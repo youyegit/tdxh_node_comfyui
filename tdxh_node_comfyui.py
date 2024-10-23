@@ -381,12 +381,55 @@ class TdxhBoolNumber:
     def tdxh_value_output(self, bool_int, bool_int_from_master, control_by_master):
         if control_by_master == "OFF":
             bool_num = bool_int
+            return (bool_num, bool_num)
         else:
-            if bool_int_from_master==1:
-                bool_num =bool_int
-            else:
-                bool_num = 0
-        return (bool_num, bool_num)
+            bool_num = int(bool(bool_int) and bool(bool_int_from_master))
+            return (bool_num, bool_num) 
+        
+
+class TdxhToggleMaster:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "boolean": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("BOOLEAN","NUMBER","INT")
+    RETURN_NAMES = ("BOOLEAN","NUMBER","INT")
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_bool"
+
+    def tdxh_value_output(self, boolean):
+        bool_num = 1 if boolean else 0
+        return (boolean, bool_num, bool_num) 
+
+class TdxhToggleGuest:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "boolean": ("BOOLEAN", {"default": True}),
+                "boolean_from_master": ("BOOLEAN", {"default": True}),
+                "control_by_master": ("BOOLEAN", {"default": False}),
+            }
+        }
+
+    RETURN_TYPES = ("BOOLEAN","NUMBER","INT")
+    RETURN_NAMES = ("BOOLEAN","NUMBER","INT")
+    FUNCTION = "tdxh_value_output"
+    #OUTPUT_NODE = False
+    CATEGORY = "TDXH/tdxh_bool"
+
+    def tdxh_value_output(self, boolean, boolean_from_master, control_by_master):
+        if not control_by_master:
+            bool_num = int(boolean)
+            return (boolean, bool_num, bool_num) 
+        else:
+            bool_num = int(boolean and boolean_from_master)
+            return (bool(bool_num), bool_num, bool_num) 
 
 class TdxhClipVison:
     @classmethod
@@ -534,9 +577,15 @@ class TdxhReference:
         if bool_int == 0:
             return (model,main_latent)
         from nodes import VAEEncode
-        from custom_nodes.reference_only import ReferenceOnlySimple
         reference=VAEEncode().encode(vae, pixels)[0]
-        return ReferenceOnlySimple().reference_only(model, reference, batch_size)
+        if os.path.isdir(os.path.join(custom_nodes_dir, 'ComfyUI_experiments')):
+            from custom_nodes.ComfyUI_experiments.reference_only import ReferenceOnlySimple
+            return ReferenceOnlySimple().reference_only(model, reference, batch_size)
+        elif os.path.isfile(os.path.join(custom_nodes_dir, 'reference_only.py')):
+            from custom_nodes.reference_only import ReferenceOnlySimple
+            return ReferenceOnlySimple().reference_only(model, reference, batch_size)
+        else:
+            raise RuntimeError("You must install custom_nodes: ComfyUI_experiments or provide reference_only.py!")
 
 class TdxhImg2ImgLatent:
     @classmethod
@@ -586,6 +635,8 @@ NODE_CLASS_MAPPINGS = {
     # tdxh_bool
     "TdxhOnOrOff":TdxhOnOrOff,
     "TdxhBoolNumber":TdxhBoolNumber,
+    "TdxhToggleMaster":TdxhToggleMaster,
+    "TdxhToggleGuest":TdxhToggleGuest,
     # tdxh_efficiency
     "TdxhClipVison" : TdxhClipVison,
     "TdxhControlNetProcessor":TdxhControlNetProcessor,
@@ -609,6 +660,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     # tdxh_bool
     "TdxhOnOrOff":"TdxhOnOrOff",
     "TdxhBoolNumber":"TdxhBoolNumber",
+    "TdxhToggleMaster":"TdxhToggleMaster",
+    "TdxhToggleGuest":"TdxhToggleGuest",
     # tdxh_efficiency
     "TdxhClipVison" : "TdxhClipVison",
     "TdxhControlNetProcessor":"TdxhControlNetProcessor",
