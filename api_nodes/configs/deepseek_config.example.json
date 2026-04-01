@@ -1,0 +1,5 @@
+{
+  "api_key": "sk-your-deepseek-api-key",
+  "base_url": "https://api.deepseek.com",
+  "timeout_seconds": 60
+}

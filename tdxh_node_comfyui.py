@@ -245,6 +245,62 @@ class TdxhStringInput:
 
     def tdxh_value_output(self, string_value):
         return (string_value,)   
+
+class TdxhSaveText:
+    def __init__(self):
+        self.output_dir = folder_paths.get_output_directory()
+        self.type = "output"
+        self.prefix_append = ""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text": ("STRING", {
+                    "forceInput": True
+                }),
+                "filename_prefix": ("STRING", {
+                    "default": "text/ComfyUI"
+                }),
+            },
+            "hidden": {
+                "prompt": "PROMPT",
+                "extra_pnginfo": "EXTRA_PNGINFO"
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("text", "saved_text_path")
+    FUNCTION = "save_text"
+    OUTPUT_NODE = True
+    CATEGORY = "TDXH/tdxh_data"
+
+    def save_text(self, text, filename_prefix="text/ComfyUI", prompt=None, extra_pnginfo=None):
+        if isinstance(text, (list, tuple)):
+            text = "\n".join("" if t is None else str(t) for t in text)
+        elif text is None:
+            text = ""
+        else:
+            text = str(text)
+
+        filename_prefix += self.prefix_append
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, self.output_dir
+        )
+
+        file = f"{filename}_{counter:05}_.txt"
+        file_path = os.path.join(full_output_folder, file)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+        saved_path = os.path.join(subfolder, file) if subfolder else file
+        return {
+            "ui": {
+                "text": (saved_path,)
+            },
+            "result": (text, saved_path)
+        }
+
 class TdxhStringInputTranslator:
     @classmethod
     def INPUT_TYPES(cls):
@@ -631,6 +687,7 @@ NODE_CLASS_MAPPINGS = {
     "TdxhIntInput":TdxhIntInput,
     "TdxhFloatInput":TdxhFloatInput,
     "TdxhStringInput":TdxhStringInput,
+    "TdxhSaveText":TdxhSaveText,
     "TdxhStringInputTranslator":TdxhStringInputTranslator,
     # tdxh_bool
     "TdxhOnOrOff":TdxhOnOrOff,
@@ -656,6 +713,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TdxhIntInput":"TdxhIntInput",
     "TdxhFloatInput":"TdxhFloatInput",
     "TdxhStringInput":"TdxhStringInput",
+    "TdxhSaveText":"TdxhSaveText",
     "TdxhStringInputTranslator":"TdxhStringInputTranslator",
     # tdxh_bool
     "TdxhOnOrOff":"TdxhOnOrOff",

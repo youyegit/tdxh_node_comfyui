@@ -3,7 +3,7 @@ name = "tdxh_node_comfyui"
 description = "Add Switch on nodes, Make nodes amount small! It helps conveniently to use less nodes for doing the same things.  "
 version = "1.0.0"
 license = { file = "LICENSE" }
-dependencies = ["sentencepiece"]
+dependencies = ["sentencepiece", "requests"]
 
 [project.urls]
 Repository = "https://github.com/youyegit/tdxh_node_comfyui"

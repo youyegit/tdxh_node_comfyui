@@ -2,3 +2,5 @@ model
 test.py
 __pycache__/
 *.py[cod]
+api_nodes/configs/deepseek_config.json
+api_nodes/configs/kimi_config.json
