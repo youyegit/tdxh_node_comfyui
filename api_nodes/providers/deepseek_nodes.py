@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import traceback
 
 import requests
@@ -9,7 +10,9 @@ PROVIDERS_DIR = os.path.dirname(os.path.abspath(__file__))
 API_NODES_DIR = os.path.dirname(PROVIDERS_DIR)
 CONFIG_PATH = os.path.join(API_NODES_DIR, "configs", "deepseek_config.json")
 DEFAULT_BASE_URL = "https://api.deepseek.com"
-DEFAULT_TIMEOUT = 60
+DEFAULT_TIMEOUT = 120
+REQUEST_RETRY_COUNT = 3
+REQUEST_RETRY_DELAYS = (1.0, 2.0)
 
 
 def _load_config():
@@ -50,6 +53,29 @@ def _build_error(message):
     return ("", "", message)
 
 
+def _build_system_messages(system_prompt):
+    if str(system_prompt).strip():
+        return [{"role": "system", "content": system_prompt}]
+    return []
+
+
+def _should_retry_request(status_code, error_message):
+    if status_code in (408, 429, 500, 502, 503, 504):
+        return True
+
+    lowered = str(error_message).lower()
+    markers = (
+        "timed out",
+        "timeout",
+        "overloaded",
+        "try again later",
+        "server is busy",
+        "service unavailable",
+        "temporarily unavailable",
+    )
+    return any(marker in lowered for marker in markers)
+
+
 class _DeepSeekBaseNode:
     def __init__(self):
         self.message_history = []
@@ -75,29 +101,53 @@ class _DeepSeekBaseNode:
             "Content-Type": "application/json",
         }
 
-        try:
-            response = requests.post(
-                url,
-                headers=headers,
-                json=payload,
-                timeout=config["timeout_seconds"],
-            )
-        except requests.RequestException as exc:
-            return None, f"DeepSeek request failed: {exc}"
+        last_error = ""
+        for attempt in range(1, REQUEST_RETRY_COUNT + 1):
+            try:
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=config["timeout_seconds"],
+                )
+            except requests.Timeout as exc:
+                last_error = f"DeepSeek request timed out after {config['timeout_seconds']} seconds: {exc}"
+                if attempt < REQUEST_RETRY_COUNT:
+                    delay = REQUEST_RETRY_DELAYS[min(attempt - 1, len(REQUEST_RETRY_DELAYS) - 1)]
+                    print(
+                        f"[DeepSeek API] Timeout on attempt {attempt}/{REQUEST_RETRY_COUNT}. "
+                        f"Retrying in {delay:.1f}s."
+                    )
+                    time.sleep(delay)
+                    continue
+                return None, last_error
+            except requests.RequestException as exc:
+                return None, f"DeepSeek request failed: {exc}"
 
-        try:
-            data = response.json()
-        except ValueError:
-            text = response.text[:1000]
-            return None, f"DeepSeek returned non-JSON response ({response.status_code}): {text}"
+            try:
+                data = response.json()
+            except ValueError:
+                text = response.text[:1000]
+                return None, f"DeepSeek returned non-JSON response ({response.status_code}): {text}"
 
-        if not response.ok:
+            if response.ok:
+                return data, ""
+
             error_message = data.get("error", {}).get("message") or data.get("message") or json.dumps(data, ensure_ascii=False)
+            if _should_retry_request(response.status_code, error_message) and attempt < REQUEST_RETRY_COUNT:
+                delay = REQUEST_RETRY_DELAYS[min(attempt - 1, len(REQUEST_RETRY_DELAYS) - 1)]
+                print(
+                    f"[DeepSeek API] Temporary failure on attempt {attempt}/{REQUEST_RETRY_COUNT}. "
+                    f"Retrying in {delay:.1f}s. Detail: {error_message}"
+                )
+                time.sleep(delay)
+                continue
+
             if response.status_code == 429:
                 error_message = f"Rate limited or account/billing issue: {error_message}"
             return None, f"DeepSeek API error {response.status_code}: {error_message}"
 
-        return data, ""
+        return None, last_error or "DeepSeek request failed for an unknown reason."
 
     def _extract_message(self, response_data):
         choices = response_data.get("choices") or []
@@ -138,10 +188,11 @@ class TdxhDeepSeekChat(_DeepSeekBaseNode):
         if clear_history:
             self.message_history = []
 
+        system_messages = _build_system_messages(system_prompt)
         if keep_history:
-            messages = [{"role": "system", "content": system_prompt}] + list(self.message_history)
+            messages = system_messages + list(self.message_history)
         else:
-            messages = [{"role": "system", "content": system_prompt}]
+            messages = list(system_messages)
 
         messages.append({"role": "user", "content": prompt})
 

@@ -1,5 +1,5 @@
 {
   "api_key": "sk-your-moonshot-api-key",
   "base_url": "https://api.moonshot.ai/v1",
-  "timeout_seconds": 60
+  "timeout_seconds": 120
 }

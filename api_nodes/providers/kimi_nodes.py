@@ -17,7 +17,7 @@ PLUGIN_ROOT_DIR = os.path.dirname(API_NODES_DIR)
 COMFY_ROOT_DIR = os.path.dirname(os.path.dirname(PLUGIN_ROOT_DIR))
 CONFIG_PATH = os.path.join(API_NODES_DIR, "configs", "kimi_config.json")
 DEFAULT_BASE_URL = "https://api.moonshot.ai/v1"
-DEFAULT_TIMEOUT = 60
+DEFAULT_TIMEOUT = 120
 OVERLOAD_RETRY_COUNT = 3
 OVERLOAD_RETRY_DELAYS = (1.0, 2.0)
 DEFAULT_PLACEHOLDER_IMAGE_PATH = os.path.join(COMFY_ROOT_DIR, "input", "example.png")
@@ -230,6 +230,12 @@ def _validate_prompt(prompt, node_label):
     return f"{node_label}: request was not sent to Kimi because prompt is empty."
 
 
+def _build_system_messages(system_prompt):
+    if str(system_prompt).strip():
+        return [{"role": "system", "content": system_prompt}]
+    return []
+
+
 def _collect_image_urls(images, node_label):
     image_urls = []
     gap_found = False
@@ -310,6 +316,16 @@ class _KimiBaseNode:
                     json=payload,
                     timeout=config["timeout_seconds"],
                 )
+            except requests.Timeout as exc:
+                if attempt < OVERLOAD_RETRY_COUNT:
+                    delay = OVERLOAD_RETRY_DELAYS[min(attempt - 1, len(OVERLOAD_RETRY_DELAYS) - 1)]
+                    print(
+                        f"[Kimi API] Timeout on attempt {attempt}/{OVERLOAD_RETRY_COUNT}. "
+                        f"Retrying in {delay:.1f}s."
+                    )
+                    time.sleep(delay)
+                    continue
+                return None, f"Kimi request timed out after {config['timeout_seconds']} seconds: {exc}"
             except requests.RequestException as exc:
                 return None, f"Kimi request failed: {exc}"
 
@@ -408,10 +424,11 @@ class TdxhKimiChat(_KimiBaseNode):
         if clear_history:
             self.message_history = []
 
+        system_messages = _build_system_messages(system_prompt)
         if keep_history:
-            messages = [{"role": "system", "content": system_prompt}] + list(self.message_history)
+            messages = system_messages + list(self.message_history)
         else:
-            messages = [{"role": "system", "content": system_prompt}]
+            messages = list(system_messages)
 
         messages.append({"role": "user", "content": prompt})
 
@@ -537,10 +554,11 @@ class TdxhKimiDynamicVisionChat(_KimiBaseNode):
         if clear_history:
             self.message_history = []
 
+        system_messages = _build_system_messages(system_prompt)
         if keep_history:
-            messages = [{"role": "system", "content": system_prompt}] + list(self.message_history)
+            messages = system_messages + list(self.message_history)
         else:
-            messages = [{"role": "system", "content": system_prompt}]
+            messages = list(system_messages)
 
         user_content = _build_kimi_user_content(prompt, image_urls)
         messages.append({"role": "user", "content": user_content})
