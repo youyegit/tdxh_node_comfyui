@@ -72,6 +72,7 @@ Notes:
 ### Kimi API nodes
 This repo now also includes:
 - `TdxhKimiChat`
+- `TdxhKimiDynamicVisionChat`
 
 Config priority:
 1. environment variable `MOONSHOT_API_KEY`
@@ -92,6 +93,10 @@ Notes:
 - `TdxhKimiChat` uses `kimi-k2.5`
 - `TdxhKimiChat` can disable thinking by sending `thinking: {"type":"disabled"}`
 - `TdxhKimiChat` already has a `thinking_enabled` toggle in the node UI
+- `TdxhKimiDynamicVisionChat` supports a dynamic number of image inputs with an `Update inputs` button
+- dynamic image inputs allow trailing image inputs to be empty, but do not allow gaps in the middle; if `image_4` is connected then `image_1` to `image_3` must also be connected
+- `TdxhKimiDynamicVisionChat` requires Moonshot Open Platform endpoints, not the Kimi Code endpoint
+- ComfyUI placeholder images coming from `LoadImage(example.png)` are treated as empty image inputs, including common resize-like preprocessing results
 - both nodes output `reasoning_content` when the model returns it
 - if `keep_history` is enabled, the node stores `reasoning_content` in assistant history to follow Moonshot's thinking-model guidance
 - config files are stored under `api_nodes/configs/`
@@ -99,6 +104,7 @@ Notes:
 ### Multi-platform fallback node
 This repo also includes:
 - `TdxhMultiPlatformChat`
+- `TdxhMultiPlatformDynamicVisionChat`
 
 Features:
 - supports provider priority ordering with `provider_1`, `provider_2`, and `provider_3`
@@ -112,6 +118,11 @@ Features:
   - `status`
   - `used_provider`
   - `attempt_log`
+
+Vision notes:
+- `TdxhMultiPlatformDynamicVisionChat` supports dynamic image inputs with an `Update inputs` button
+- if all connected images are placeholders such as `LoadImage(example.png)`, the node treats them as empty and falls back to text chat
+- `TdxhMultiPlatformDynamicVisionChat` currently works with `kimi`; `deepseek` is kept as a reserved provider slot but returns an explicit unsupported error until DeepSeek publishes official public vision API documentation
 
 # Thanks
 Some codes are from The official [ComfyUI](https://github.com/comfyanonymous/ComfyUI.git) and other custom nodes like The [was-node-suite-comfyui](https://github.com/WASasquatch/was-node-suite-comfyui.git).

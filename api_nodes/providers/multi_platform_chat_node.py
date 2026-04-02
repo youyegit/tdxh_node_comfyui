@@ -19,7 +19,7 @@ class TdxhMultiPlatformChat:
                 "prompt": ("STRING", {"multiline": True, "default": ""}),
                 "system_prompt": (
                     "STRING",
-                    {"multiline": True, "default": "You are a helpful assistant."},
+                    {"multiline": True, "default": ""},
                 ),
                 "provider_1": (PLATFORM_CHOICES, {"default": "deepseek"}),
                 "provider_2": (PLATFORM_CHOICES, {"default": "kimi"}),

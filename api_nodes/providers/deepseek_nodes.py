@@ -118,7 +118,7 @@ class TdxhDeepSeekChat(_DeepSeekBaseNode):
                 "prompt": ("STRING", {"multiline": True, "default": ""}),
                 "system_prompt": (
                     "STRING",
-                    {"multiline": True, "default": "You are a helpful assistant."},
+                    {"multiline": True, "default": ""},
                 ),
                 "keep_history": ("BOOLEAN", {"default": False}),
                 "clear_history": ("BOOLEAN", {"default": False}),
