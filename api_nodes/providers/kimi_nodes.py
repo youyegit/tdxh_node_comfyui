@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import os
 import time
@@ -23,6 +24,9 @@ OVERLOAD_RETRY_DELAYS = (1.0, 2.0)
 DEFAULT_PLACEHOLDER_IMAGE_PATH = os.path.join(COMFY_ROOT_DIR, "input", "example.png")
 _PLACEHOLDER_IMAGE_HASHES = None
 _PLACEHOLDER_IMAGE_SIGNATURE = None
+DEFAULT_KIMI_CHAT_MODEL = "kimi-k2-turbo-preview"
+DEFAULT_KIMI_THINKING_MODEL = "kimi-k2.5"
+DEFAULT_KIMI_VISION_MODEL = "moonshot-v1-8k-vision-preview"
 
 
 def _load_config():
@@ -49,6 +53,9 @@ def _load_config():
         "api_key": str(api_key).strip(),
         "base_url": str(base_url).rstrip("/"),
         "timeout_seconds": int(timeout),
+        "chat_model": str(config.get("chat_model", DEFAULT_KIMI_CHAT_MODEL)).strip() or DEFAULT_KIMI_CHAT_MODEL,
+        "thinking_model": str(config.get("thinking_model", DEFAULT_KIMI_THINKING_MODEL)).strip() or DEFAULT_KIMI_THINKING_MODEL,
+        "vision_model": str(config.get("vision_model", DEFAULT_KIMI_VISION_MODEL)).strip() or DEFAULT_KIMI_VISION_MODEL,
     }
 
 
@@ -102,6 +109,15 @@ def _image_to_data_url(image):
     pil_image.save(buffer, format="PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{encoded}"
+
+
+def _image_to_png_bytes(image):
+    image_array = _image_to_numpy_rgb(image)
+    pil_image = Image.fromarray(image_array)
+
+    buffer = BytesIO()
+    pil_image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def _image_to_numpy_rgb(image):
@@ -236,6 +252,21 @@ def _build_system_messages(system_prompt):
     return []
 
 
+def _should_use_json_mode(prompt, system_prompt):
+    combined = f"{system_prompt}\n{prompt}".lower()
+    markers = (
+        "```json",
+        '"镜头1"',
+        '"shot1"',
+        '"scene1"',
+        "json格式",
+        "json format",
+        "json_object",
+        "json object",
+    )
+    return any(marker in combined for marker in markers)
+
+
 def _collect_image_urls(images, node_label):
     image_urls = []
     gap_found = False
@@ -267,6 +298,46 @@ def _collect_image_urls(images, node_label):
     return image_urls
 
 
+def _collect_image_blobs(images, node_label):
+    image_blobs = []
+    gap_found = False
+    first_empty_reason = ""
+
+    for idx, image in enumerate(images, start=1):
+        if _is_empty_image_input(image):
+            gap_found = True
+            if not first_empty_reason:
+                first_empty_reason = _empty_image_reason(image, idx)
+            continue
+
+        if gap_found:
+            raise ValueError(
+                f"{node_label}: request was not sent to Kimi because {first_empty_reason}, so image_{idx} cannot be used after that. "
+                "Only trailing image inputs may be empty."
+            )
+
+        try:
+            png_bytes = _image_to_png_bytes(image)
+        except Exception as exc:
+            raise ValueError(f"{node_label}: request was not sent to Kimi because image_{idx} could not be encoded: {exc}") from exc
+
+        image_blobs.append(
+            {
+                "index": idx,
+                "bytes": png_bytes,
+                "sha256": hashlib.sha256(png_bytes).hexdigest(),
+                "filename": f"image_{idx}.png",
+            }
+        )
+
+    if not image_blobs:
+        if first_empty_reason:
+            raise ValueError(f"{node_label}: request was not sent to Kimi because no valid image was provided. First empty slot: {first_empty_reason}.")
+        raise ValueError(f"{node_label}: request was not sent to Kimi because no valid image was provided.")
+
+    return image_blobs
+
+
 def _should_retry_overload(status_code, error_message):
     if status_code not in (429, 500, 502, 503, 504):
         return False
@@ -285,6 +356,8 @@ def _should_retry_overload(status_code, error_message):
 class _KimiBaseNode:
     def __init__(self):
         self.message_history = []
+        self._uploaded_image_cache = {}
+        self._session = requests.Session()
 
     def _config_error(self):
         return (
@@ -310,7 +383,7 @@ class _KimiBaseNode:
 
         for attempt in range(1, OVERLOAD_RETRY_COUNT + 1):
             try:
-                response = requests.post(
+                response = self._session.post(
                     url,
                     headers=headers,
                     json=payload,
@@ -367,6 +440,80 @@ class _KimiBaseNode:
             return None, f"Kimi API error {response.status_code}: {error_message}"
 
         return None, "Kimi request failed for an unknown reason."
+
+    def _upload_image_and_get_ms_url(self, image_blob):
+        cached = self._uploaded_image_cache.get(image_blob["sha256"])
+        if cached:
+            return cached, ""
+
+        try:
+            config = _load_config()
+        except Exception as exc:
+            return "", f"Failed to load Kimi config: {exc}"
+
+        if not config["api_key"]:
+            return "", self._config_error()
+
+        base_url = _normalize_base_url(config["base_url"])
+        url = f"{base_url}/files"
+        headers = {
+            "Authorization": f"Bearer {config['api_key']}",
+        }
+        files = {
+            "file": (image_blob["filename"], image_blob["bytes"], "image/png"),
+        }
+        data = {
+            "purpose": "image",
+        }
+
+        for attempt in range(1, OVERLOAD_RETRY_COUNT + 1):
+            try:
+                response = self._session.post(
+                    url,
+                    headers=headers,
+                    files=files,
+                    data=data,
+                    timeout=config["timeout_seconds"],
+                )
+            except requests.Timeout as exc:
+                if attempt < OVERLOAD_RETRY_COUNT:
+                    delay = OVERLOAD_RETRY_DELAYS[min(attempt - 1, len(OVERLOAD_RETRY_DELAYS) - 1)]
+                    print(
+                        f"[Kimi Files] Timeout on upload attempt {attempt}/{OVERLOAD_RETRY_COUNT}. "
+                        f"Retrying in {delay:.1f}s."
+                    )
+                    time.sleep(delay)
+                    continue
+                return "", f"Kimi image upload timed out after {config['timeout_seconds']} seconds: {exc}"
+            except requests.RequestException as exc:
+                return "", f"Kimi image upload failed: {exc}"
+
+            try:
+                response_data = response.json()
+            except ValueError:
+                return "", f"Kimi image upload returned non-JSON response ({response.status_code}): {response.text[:1000]}"
+
+            if response.ok:
+                file_id = response_data.get("id", "")
+                if not file_id:
+                    return "", "Kimi image upload succeeded but no file id was returned."
+                ms_url = f"ms://{file_id}"
+                self._uploaded_image_cache[image_blob["sha256"]] = ms_url
+                return ms_url, ""
+
+            error_message = response_data.get("error", {}).get("message") or response_data.get("message") or json.dumps(response_data, ensure_ascii=False)
+            if _should_retry_overload(response.status_code, error_message) and attempt < OVERLOAD_RETRY_COUNT:
+                delay = OVERLOAD_RETRY_DELAYS[min(attempt - 1, len(OVERLOAD_RETRY_DELAYS) - 1)]
+                print(
+                    f"[Kimi Files] Temporary failure on attempt {attempt}/{OVERLOAD_RETRY_COUNT}. "
+                    f"Retrying in {delay:.1f}s. Detail: {error_message}"
+                )
+                time.sleep(delay)
+                continue
+
+            return "", f"Kimi image upload error {response.status_code}: {error_message}"
+
+        return "", "Kimi image upload failed for an unknown reason."
 
     def _extract_message(self, response_data):
         choices = response_data.get("choices") or []
@@ -433,11 +580,14 @@ class TdxhKimiChat(_KimiBaseNode):
         messages.append({"role": "user", "content": prompt})
 
         payload = {
-            "model": "kimi-for-coding" if is_kimi_coding else "kimi-k2.5",
+            "model": "kimi-for-coding" if is_kimi_coding else (config["thinking_model"] if thinking_enabled else config["chat_model"]),
             "messages": messages,
             "max_tokens": max_tokens,
             "stream": False,
         }
+
+        if _should_use_json_mode(prompt, system_prompt):
+            payload["response_format"] = {"type": "json_object"}
 
         if is_kimi_coding:
             if thinking_enabled:
@@ -476,7 +626,8 @@ class TdxhKimiDynamicVisionChat(_KimiBaseNode):
         "Dynamic multi-image Kimi vision chat node. Increase image inputs with 'Update inputs'. "
         "Trailing image slots may be empty, but gaps in the middle are not allowed. "
         "Placeholder filenames such as 'example.png' are treated as empty image inputs. "
-        "Outputs originating from LoadImage(example.png) are also treated as empty placeholder images."
+        "Outputs originating from LoadImage(example.png) are also treated as empty placeholder images. "
+        "Valid images are uploaded to Moonshot Files and reused via ms://file_id for lower request overhead."
     )
 
     @classmethod
@@ -545,11 +696,19 @@ class TdxhKimiDynamicVisionChat(_KimiBaseNode):
             images.append(kwargs.get(f"image_{idx}"))
 
         try:
-            image_urls = _collect_image_urls(images, "TdxhKimiDynamicVisionChat")
+            image_blobs = _collect_image_blobs(images, "TdxhKimiDynamicVisionChat")
         except Exception as exc:
             message = str(exc)
             print(f"[TdxhKimiDynamicVisionChat] ERROR: {message}")
             return ("", "", message)
+
+        image_urls = []
+        for image_blob in image_blobs:
+            image_url, error = self._upload_image_and_get_ms_url(image_blob)
+            if error:
+                print(f"[TdxhKimiDynamicVisionChat] ERROR: {error}")
+                return ("", "", error)
+            image_urls.append(image_url)
 
         if clear_history:
             self.message_history = []
@@ -564,11 +723,14 @@ class TdxhKimiDynamicVisionChat(_KimiBaseNode):
         messages.append({"role": "user", "content": user_content})
 
         payload = {
-            "model": "kimi-k2.5",
+            "model": config["thinking_model"] if thinking_enabled else config["vision_model"],
             "messages": messages,
             "max_tokens": max_tokens,
             "stream": False,
         }
+
+        if _should_use_json_mode(prompt, system_prompt):
+            payload["response_format"] = {"type": "json_object"}
 
         if thinking_enabled:
             payload["temperature"] = temperature

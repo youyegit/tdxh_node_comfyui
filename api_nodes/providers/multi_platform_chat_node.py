@@ -1,8 +1,18 @@
 from .deepseek_nodes import TdxhDeepSeekChat
 from .kimi_nodes import TdxhKimiChat
+from .local_qwenvl_nodes import (
+    _TdxhLocalQwenVLTextBackend,
+    get_local_qwenvl_provider_choices,
+)
 
 
-PLATFORM_CHOICES = ["deepseek", "kimi", "disabled"]
+def _text_platform_choices():
+    choices = ["deepseek", "kimi"]
+    for provider_name in get_local_qwenvl_provider_choices():
+        if provider_name not in choices:
+            choices.append(provider_name)
+    choices.append("disabled")
+    return choices
 
 
 class TdxhMultiPlatformChat:
@@ -11,9 +21,12 @@ class TdxhMultiPlatformChat:
             "deepseek": TdxhDeepSeekChat(),
             "kimi": TdxhKimiChat(),
         }
+        self._local_qwenvl_text = _TdxhLocalQwenVLTextBackend()
 
     @classmethod
     def INPUT_TYPES(cls):
+        platform_choices = _text_platform_choices()
+        default_provider_2 = "kimi" if "kimi" in platform_choices else platform_choices[0]
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True, "default": ""}),
@@ -21,9 +34,9 @@ class TdxhMultiPlatformChat:
                     "STRING",
                     {"multiline": True, "default": ""},
                 ),
-                "provider_1": (PLATFORM_CHOICES, {"default": "deepseek"}),
-                "provider_2": (PLATFORM_CHOICES, {"default": "kimi"}),
-                "provider_3": (PLATFORM_CHOICES, {"default": "disabled"}),
+                "provider_1": (platform_choices, {"default": "deepseek"}),
+                "provider_2": (platform_choices, {"default": default_provider_2}),
+                "provider_3": (platform_choices, {"default": "disabled"}),
                 "thinking_enabled": ("BOOLEAN", {"default": False}),
                 "keep_history": ("BOOLEAN", {"default": False}),
                 "clear_history": ("BOOLEAN", {"default": False}),
@@ -82,6 +95,18 @@ class TdxhMultiPlatformChat:
                 max_tokens,
             )
 
+        if provider_name in get_local_qwenvl_provider_choices():
+            return self._local_qwenvl_text.run(
+                provider_name=provider_name,
+                prompt=prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                top_p=top_p,
+                repetition_penalty=1.2,
+                max_tokens=max_tokens,
+                keep_model_loaded=False,
+            )
+
         return ("", "", f"Unsupported provider: {provider_name}")
 
     def run(
@@ -100,7 +125,7 @@ class TdxhMultiPlatformChat:
     ):
         ordered = self._ordered_providers(provider_1, provider_2, provider_3)
         if not ordered:
-            message = "No provider selected. Set provider_1, provider_2, or provider_3 to deepseek or kimi."
+            message = "No provider selected. Set provider_1, provider_2, or provider_3 to deepseek, kimi, or a LocalQwenVL provider."
             print(f"[TdxhMultiPlatformChat] ERROR: {message}")
             raise RuntimeError(message)
 

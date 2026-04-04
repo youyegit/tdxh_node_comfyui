@@ -59,6 +59,21 @@ def _build_system_messages(system_prompt):
     return []
 
 
+def _should_use_json_mode(prompt, system_prompt):
+    combined = f"{system_prompt}\n{prompt}".lower()
+    markers = (
+        "```json",
+        '"镜头1"',
+        '"shot1"',
+        '"scene1"',
+        "json格式",
+        "json format",
+        "json_object",
+        "json object",
+    )
+    return any(marker in combined for marker in markers)
+
+
 def _should_retry_request(status_code, error_message):
     if status_code in (408, 429, 500, 502, 503, 504):
         return True
@@ -79,6 +94,7 @@ def _should_retry_request(status_code, error_message):
 class _DeepSeekBaseNode:
     def __init__(self):
         self.message_history = []
+        self._session = requests.Session()
 
     def _config_error(self):
         return (
@@ -104,7 +120,7 @@ class _DeepSeekBaseNode:
         last_error = ""
         for attempt in range(1, REQUEST_RETRY_COUNT + 1):
             try:
-                response = requests.post(
+                response = self._session.post(
                     url,
                     headers=headers,
                     json=payload,
@@ -202,6 +218,9 @@ class TdxhDeepSeekChat(_DeepSeekBaseNode):
             "max_tokens": max_tokens,
             "stream": False,
         }
+
+        if _should_use_json_mode(prompt, system_prompt):
+            payload["response_format"] = {"type": "json_object"}
 
         if not thinking_enabled:
             payload["temperature"] = temperature

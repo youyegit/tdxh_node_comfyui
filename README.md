@@ -58,13 +58,14 @@ You can create `deepseek_config.json` from `deepseek_config.example.json`:
 {
   "api_key": "sk-your-deepseek-api-key",
   "base_url": "https://api.deepseek.com",
-  "timeout_seconds": 60
+  "timeout_seconds": 120
 }
 ```
 
 Notes:
 - `TdxhDeepSeekChat` outputs `answer`, `reasoning`, `status`
 - `TdxhDeepSeekChat` now has a `thinking_enabled` toggle, switching between `deepseek-chat` and `deepseek-reasoner`
+- `TdxhDeepSeekChat` auto-enables JSON mode when the prompt clearly asks for JSON output
 - both nodes support optional multi-round history with `keep_history`
 - `clear_history` clears the stored conversation state inside the node instance
 - config files are stored under `api_nodes/configs/`
@@ -73,6 +74,7 @@ Notes:
 This repo now also includes:
 - `TdxhKimiChat`
 - `TdxhKimiDynamicVisionChat`
+- `TdxhLocalQwenVLDynamicVisionChat`
 
 Config priority:
 1. environment variable `MOONSHOT_API_KEY`
@@ -85,18 +87,27 @@ You can create `kimi_config.json` from `kimi_config.example.json`:
 {
   "api_key": "sk-your-moonshot-api-key",
   "base_url": "https://api.moonshot.ai/v1",
-  "timeout_seconds": 60
+  "chat_model": "kimi-k2-turbo-preview",
+  "thinking_model": "kimi-k2.5",
+  "vision_model": "moonshot-v1-8k-vision-preview",
+  "timeout_seconds": 120
 }
 ```
 
 Notes:
-- `TdxhKimiChat` uses `kimi-k2.5`
+- `TdxhKimiChat` defaults to a faster Moonshot chat model for non-thinking text requests and keeps `kimi-k2.5` for thinking requests
 - `TdxhKimiChat` can disable thinking by sending `thinking: {"type":"disabled"}`
 - `TdxhKimiChat` already has a `thinking_enabled` toggle in the node UI
 - `TdxhKimiDynamicVisionChat` supports a dynamic number of image inputs with an `Update inputs` button
 - dynamic image inputs allow trailing image inputs to be empty, but do not allow gaps in the middle; if `image_4` is connected then `image_1` to `image_3` must also be connected
 - `TdxhKimiDynamicVisionChat` requires Moonshot Open Platform endpoints, not the Kimi Code endpoint
+- `TdxhLocalQwenVLDynamicVisionChat` wraps the local `ComfyUI-QwenVL` GGUF backend under the tdxh naming convention
+- `TdxhLocalQwenVLDynamicVisionChat` supports dynamic image inputs with an `Update inputs` button and also accepts one fixed optional `video` input
+- `TdxhLocalQwenVLDynamicVisionChat` allows images and the fixed video input to be used together in one local multimodal request
+- `TdxhLocalQwenVLDynamicVisionChat` does not add extra pip dependencies inside this repo, but it requires the external `ComfyUI-QwenVL` plugin to be installed
+- `TdxhLocalQwenVLDynamicVisionChat` also depends on that plugin's GGUF vision runtime, such as a vision-capable `llama-cpp-python` build and matching QwenVL GGUF/mmproj model files
 - ComfyUI placeholder images coming from `LoadImage(example.png)` are treated as empty image inputs, including common resize-like preprocessing results
+- `TdxhKimiDynamicVisionChat` uploads valid images to Moonshot Files and reuses them via `ms://file_id` for lower request overhead on repeated calls
 - both nodes output `reasoning_content` when the model returns it
 - if `keep_history` is enabled, the node stores `reasoning_content` in assistant history to follow Moonshot's thinking-model guidance
 - config files are stored under `api_nodes/configs/`
@@ -109,7 +120,8 @@ This repo also includes:
 Features:
 - supports provider priority ordering with `provider_1`, `provider_2`, and `provider_3`
 - `provider_3` defaults to `disabled` so the node structure can stay stable for future expansion
-- current providers: `deepseek`, `kimi`
+- current providers: `deepseek`, `kimi`, `LocalQwen3VL-8B-Instruct-Q4_K_M`, `LocalQwen3VL-8B-Thinking-Q8_0`
+- in `TdxhMultiPlatformChat`, the two `LocalQwen3VL` entries are exposed for consistent provider lists but return a clear vision-only unsupported status
 - reserved for future extension by adding more providers
 - automatically falls back to the next provider when the previous one returns a non-OK status
 - outputs:
@@ -121,8 +133,9 @@ Features:
 
 Vision notes:
 - `TdxhMultiPlatformDynamicVisionChat` supports dynamic image inputs with an `Update inputs` button
+- `TdxhMultiPlatformDynamicVisionChat` supports `kimi`, `LocalQwen3VL-8B-Instruct-Q4_K_M`, and `LocalQwen3VL-8B-Thinking-Q8_0` in the same fallback chain, and also accepts one fixed optional `video` input
 - if all connected images are placeholders such as `LoadImage(example.png)`, the node treats them as empty and falls back to text chat
-- `TdxhMultiPlatformDynamicVisionChat` currently works with `kimi`; `deepseek` is kept as a reserved provider slot but returns an explicit unsupported error until DeepSeek publishes official public vision API documentation
+- `deepseek` is kept as a reserved provider slot but returns an explicit unsupported error until DeepSeek publishes official public vision API documentation
 
 # Thanks
 Some codes are from The official [ComfyUI](https://github.com/comfyanonymous/ComfyUI.git) and other custom nodes like The [was-node-suite-comfyui](https://github.com/WASasquatch/was-node-suite-comfyui.git).

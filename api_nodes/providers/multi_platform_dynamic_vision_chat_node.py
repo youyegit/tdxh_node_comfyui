@@ -1,8 +1,15 @@
 from .deepseek_nodes import TdxhDeepSeekChat
 from .kimi_nodes import TdxhKimiChat, TdxhKimiDynamicVisionChat, _is_empty_image_input
+from .local_qwenvl_nodes import TdxhLocalQwenVLDynamicVisionChat, _TdxhLocalQwenVLTextBackend
 
 
-DYNAMIC_VISION_PLATFORM_CHOICES = ["kimi", "deepseek", "disabled"]
+DYNAMIC_VISION_PLATFORM_CHOICES = [
+    "kimi",
+    "LocalQwen3VL-8B-Instruct-Q4_K_M",
+    "LocalQwen3VL-8B-Thinking-Q8_0",
+    "deepseek",
+    "disabled",
+]
 
 
 class TdxhMultiPlatformDynamicVisionChat:
@@ -10,6 +17,7 @@ class TdxhMultiPlatformDynamicVisionChat:
         "Dynamic multi-provider vision chat node with provider fallback. "
         "Providers are tried in provider_1 -> provider_2 -> provider_3 order. "
         "If no effective image is provided, the node automatically falls back to text chat using the same provider order. "
+        "The local providers are exposed as 'LocalQwen3VL-8B-Instruct-Q4_K_M' and 'LocalQwen3VL-8B-Thinking-Q8_0'. "
         "Trailing image slots may be empty, but gaps in the middle are not allowed. "
         "Placeholder filenames such as 'example.png' are treated as empty image inputs. "
         "Outputs originating from LoadImage(example.png) are also treated as empty placeholder images."
@@ -18,18 +26,20 @@ class TdxhMultiPlatformDynamicVisionChat:
     def __init__(self):
         self._vision_providers = {
             "kimi": TdxhKimiDynamicVisionChat(),
+            "LocalQwen3VL-8B-Instruct-Q4_K_M": TdxhLocalQwenVLDynamicVisionChat(),
+            "LocalQwen3VL-8B-Thinking-Q8_0": TdxhLocalQwenVLDynamicVisionChat(),
         }
         self._text_providers = {
             "deepseek": TdxhDeepSeekChat(),
             "kimi": TdxhKimiChat(),
         }
+        self._local_qwenvl_text = _TdxhLocalQwenVLTextBackend()
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "inputcount": ("INT", {"default": 2, "min": 1, "max": 24, "step": 1}),
-                "image_1": ("IMAGE",),
                 "prompt": ("STRING", {"multiline": True, "default": ""}),
                 "system_prompt": (
                     "STRING",
@@ -45,7 +55,9 @@ class TdxhMultiPlatformDynamicVisionChat:
                 "max_tokens": ("INT", {"default": 4096, "min": 1, "max": 65536, "step": 1}),
             },
             "optional": {
+                "image_1": ("IMAGE",),
                 "image_2": ("IMAGE",),
+                "video": ("IMAGE",),
             },
         }
 
@@ -98,6 +110,44 @@ class TdxhMultiPlatformDynamicVisionChat:
                 "DeepSeek vision fallback is not available yet. As of April 2, 2026, DeepSeek official API docs do not document public image input support for the Open Platform API.",
             )
 
+        if provider_name == "LocalQwen3VL-8B-Instruct-Q4_K_M":
+            local_kwargs = dict(kwargs)
+            local_video = local_kwargs.pop("video", None)
+            return self._vision_providers["LocalQwen3VL-8B-Instruct-Q4_K_M"].run(
+                inputcount=inputcount,
+                image_1=image_1,
+                prompt=prompt,
+                system_prompt=system_prompt,
+                model_name="Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=0.9,
+                repetition_penalty=1.2,
+                frame_count=inputcount,
+                keep_model_loaded=False,
+                video=local_video,
+                **local_kwargs,
+            )
+
+        if provider_name == "LocalQwen3VL-8B-Thinking-Q8_0":
+            local_kwargs = dict(kwargs)
+            local_video = local_kwargs.pop("video", None)
+            return self._vision_providers["LocalQwen3VL-8B-Thinking-Q8_0"].run(
+                inputcount=inputcount,
+                image_1=image_1,
+                prompt=prompt,
+                system_prompt=system_prompt,
+                model_name="Qwen3VL-8B-Thinking-Q8_0.gguf",
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=0.9,
+                repetition_penalty=1.2,
+                frame_count=inputcount,
+                keep_model_loaded=False,
+                video=local_video,
+                **local_kwargs,
+            )
+
         return ("", "", f"Unsupported provider: {provider_name}")
 
     def _call_text_provider(
@@ -134,18 +184,36 @@ class TdxhMultiPlatformDynamicVisionChat:
                 max_tokens,
             )
 
+        if provider_name in ("LocalQwen3VL-8B-Instruct-Q4_K_M", "LocalQwen3VL-8B-Thinking-Q8_0"):
+            return self._local_qwenvl_text.run(
+                provider_name=provider_name,
+                prompt=prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                top_p=0.9,
+                repetition_penalty=1.2,
+                max_tokens=max_tokens,
+                keep_model_loaded=True,
+            )
+
         return ("", "", f"Unsupported text fallback provider: {provider_name}")
 
-    def _has_any_effective_image(self, inputcount, image_1, **kwargs):
+    def _has_any_effective_media(self, inputcount, image_1, **kwargs):
         images = [image_1]
         for idx in range(2, int(inputcount) + 1):
             images.append(kwargs.get(f"image_{idx}"))
-        return any(not _is_empty_image_input(image) for image in images)
+        if any(not _is_empty_image_input(image) for image in images):
+            return True
+        video = kwargs.get("video")
+        if video is None:
+            return False
+        if isinstance(video, (list, tuple)):
+            return any(item is not None and not _is_empty_image_input(item) for item in video)
+        return not _is_empty_image_input(video)
 
     def run(
         self,
         inputcount,
-        image_1,
         prompt,
         system_prompt,
         provider_1,
@@ -156,6 +224,7 @@ class TdxhMultiPlatformDynamicVisionChat:
         clear_history,
         temperature,
         max_tokens,
+        image_1=None,
         **kwargs,
     ):
         ordered = self._ordered_providers(provider_1, provider_2, provider_3)
@@ -164,7 +233,7 @@ class TdxhMultiPlatformDynamicVisionChat:
             print(f"[TdxhMultiPlatformDynamicVisionChat] ERROR: {message}")
             raise RuntimeError(message)
 
-        if not self._has_any_effective_image(inputcount, image_1, **kwargs):
+        if not self._has_any_effective_media(inputcount, image_1, **kwargs):
             attempts = []
             should_clear = clear_history
 

@@ -1,2 +1,7 @@
 sentencepiece
 requests
+
+# Optional external runtime dependency for local multimodal node:
+# - TdxhLocalQwenVLDynamicVisionChat requires the ComfyUI-QwenVL plugin to be installed
+# - TdxhLocalQwenVLDynamicVisionChat also depends on that plugin's GGUF vision stack
+#   (for example llama-cpp-python vision build and QwenVL GGUF model files)

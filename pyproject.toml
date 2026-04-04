@@ -3,6 +3,9 @@ name = "tdxh_node_comfyui"
 description = "Add Switch on nodes, Make nodes amount small! It helps conveniently to use less nodes for doing the same things.  "
 version = "1.0.0"
 license = { file = "LICENSE" }
+# Keep the core package dependencies minimal here.
+# TdxhLocalQwenVLDynamicVisionChat is a wrapper around the external ComfyUI-QwenVL plugin
+# and therefore requires that plugin plus its own GGUF vision dependencies.
 dependencies = ["sentencepiece", "requests"]
 
 [project.urls]
