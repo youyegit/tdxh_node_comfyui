@@ -198,7 +198,7 @@ class TdxhLocalQwenVLDynamicVisionChat:
                 "top_p": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "repetition_penalty": ("FLOAT", {"default": 1.2, "min": 0.5, "max": 2.0, "step": 0.1}),
                 "frame_count": ("INT", {"default": 6, "min": 1, "max": 24, "step": 1}),
-                "keep_model_loaded": ("BOOLEAN", {"default": True}),
+                "keep_model_loaded": ("BOOLEAN", {"default": False}),
             },
             "optional": {
                 "image_1": ("IMAGE",),

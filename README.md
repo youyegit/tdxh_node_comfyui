@@ -43,6 +43,9 @@ pip install -r requirements.txt
 - "TdxhReference": TdxhReference makes the "reference_only" node more efficient.
 - "TdxhImg2ImgLatent": TdxhImg2ImgLatent can switch between original(main) latent and image latent (OFF -> main latent, ON -> image latent).
 
+## tdxh_ltx23
+- "TdxhLtx23MultimodalDirector": TdxhLtx23MultimodalDirector is a multimodal control hub for LTX 2.3 style workflows. It accepts text, a dynamic image sequence, optional reference audio, and optional reference video frames, then outputs a ready-to-use positive prompt, negative prompt, modality-specific guidance strings, and a structured JSON control plan. The node is meant to sit upstream of LTX prompt/conditioning workflows so users can keep character consistency, scene continuity, voice or ambience guidance, and video style/camera/rhythm guidance in one place.
+
 ## API nodes
 ### DeepSeek API nodes
 This repo now includes:
